@@ -3,75 +3,369 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Морський Бій 🚢💥</title>
+    <title>Морський Бій 🚢</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS для мережі -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    
+    <!-- Шрифти -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Кастомні стилі для гри -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
-        body { font-family: 'Nunito', sans-serif; background-color: #0f172a; color: #f8fafc; overflow-x: hidden; }
-        .battleship-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; background-color: #1e293b; padding: 4px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid #334155; }
-        .cell { aspect-ratio: 1 / 1; position: relative; border-radius: 2px; cursor: pointer; transition: transform 0.1s, filter 0.2s; display: flex; align-items: center; justify-content: center; font-size: clamp(1rem, 4vw, 1.5rem); }
-        .cell-water { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); }
-        .cell-ship { background: repeating-linear-gradient(45deg, #475569, #475569 4px, #334155 4px, #334155 8px); }
-        .explosion { background-color: #ef4444 !important; }
-        .splash { background-color: #0c4a6e !important; }
-        .falling-bomb { position: fixed; width: 12px; height: 30px; background: linear-gradient(to bottom, #111 60%, #ef4444 100%); border-radius: 50% 50% 10% 10%; z-index: 9999; pointer-events: none; }
-    </style>
-</head>
-<body class="min-h-screen flex flex-col items-center py-6 px-4">
-    <header class="text-center mb-6">
-        <h1 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 tracking-wider">МОРСЬКИЙ БІЙ 🚢</h1>
-        <p id="status-text" class="text-lg text-slate-300 mt-2 font-bold animate-pulse">Оберіть режим гри</p>
-    </header>
 
-    <div id="lobby-screen" class="w-full max-w-md bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 text-center">
-        <button onclick="startBotGame()" class="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-xl font-bold transition-transform active:scale-95">🤖 Грати з розумним Ботом</button>
-        <div class="relative py-4"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-600"></div></div><div class="relative flex justify-center"><span class="bg-slate-800 px-4 text-slate-400">АБО</span></div></div>
-        <button onclick="createGame()" id="btn-create" class="w-full py-3 bg-blue-600 rounded-xl font-bold">➕ Створити гру</button>
-        <div id="connection-box" class="hidden flex-col gap-3 p-4 bg-slate-900 rounded-xl mt-4">
-            <span id="my-id-display" class="text-2xl font-black text-emerald-400 tracking-widest bg-slate-800 px-4 py-2 rounded-lg">...</span>
-            <button onclick="copyLink()" class="text-sm text-blue-400 underline">🔗 Скопіювати посилання</button>
-        </div>
-        <input type="text" id="join-id-input" placeholder="Код друга" class="w-full mt-4 bg-slate-700 p-3 rounded-xl text-center uppercase">
-        <button onclick="joinGame()" class="w-full mt-2 py-3 bg-emerald-600 rounded-xl font-bold">Вхід</button>
-    </div>
-
-    <div id="game-screen" class="hidden w-full max-w-4xl flex-col md:flex-row gap-8 justify-center items-start">
-        <div id="my-grid" class="battleship-grid w-full max-w-sm"></div>
-        <div id="enemy-grid" class="battleship-grid w-full max-w-sm relative"><div id="turn-overlay" class="absolute inset-0 bg-slate-900/60 z-20 flex items-center justify-center backdrop-blur-sm hidden"></div></div>
-    </div>
-
-    <script>
-        // --- 1. Оголошення функцій-помічників (щоб не було помилок) ---
-        function createEmptyGrid() {
-            return Array(10).fill(null).map(() => Array(10).fill(null).map(() => ({hasShip: false, fired: false, shipId: null, status: 'water'})));
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
         }
 
-        function canPlaceShip(grid, r, c, size, isHorizontal) {
-            if (isHorizontal && c + size > 10) return false;
-            if (!isHorizontal && r + size > 10) return false;
-            for (let i = 0; i < size; i++) {
-                const nr = isHorizontal ? r : r + i;
-                const nc = isHorizontal ? c + i : c;
-                for (let dr = -1; dr <= 1; dr++) {
-                    for (let dc = -1; dc <= 1; dc++) {
-                        const rr = nr + dr; const cc = nc + dc;
-                        if (rr >= 0 && rr < 10 && cc >= 0 && cc < 10 && grid[rr][cc].hasShip) return false;
-                    }
-                }
+        /* Ігрова сітка */
+        .battleship-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 2px;
+            background-color: #1e293b;
+            padding: 4px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 2px solid #334155;
+        }
+
+        .cell {
+            aspect-ratio: 1 / 1;
+            position: relative;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: transform 0.1s, filter 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(1rem, 4vw, 1.5rem);
+            overflow: hidden; /* Щоб анімації не вилазили за межі клітинки */
+        }
+
+        .enemy-cell:hover {
+            filter: brightness(1.3);
+            transform: scale(1.05);
+            z-index: 10;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5); /* Блакитне свічення при наведенні */
+        }
+
+        /* Спрайт Води (Хвилі) */
+        .cell-water {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            box-shadow: inset 0 0 5px rgba(255,255,255,0.1);
+        }
+        .cell-water::before {
+            content: '';
+            position: absolute;
+            top: 10%; left: 10%; right: 10%; bottom: 10%;
+            background-image: radial-gradient(circle at center, rgba(255,255,255,0.15) 0%, transparent 50%);
+            border-radius: 50%;
+            animation: pulse-wave 3s infinite ease-in-out alternate;
+        }
+
+        /* Спрайт Корабля (Метал) */
+        .cell-ship {
+            background: repeating-linear-gradient(45deg, #475569, #475569 4px, #334155 4px, #334155 8px);
+            border: 2px solid #1e293b;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.6);
+        }
+
+        /* Анімації влучання та промаху */
+        .explosion {
+            /* Обгорілий метал замість просто червоного кольору */
+            background: radial-gradient(circle, #b91c1c 20%, #7f1d1d 80%) !important;
+            border: 1px solid #450a0a !important;
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both, pulse-fire 1.5s infinite alternate;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 0 15px rgba(239, 68, 68, 0.6);
+            z-index: 5;
+        }
+        
+        /* Додатковий ефект диму для підбитого корабля */
+        .explosion::after {
+             content: '';
+             position: absolute;
+             top: 0; left: 0; right: 0; bottom: 0;
+             background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.6) 100%);
+             pointer-events: none;
+        }
+
+        .splash {
+            /* Темніша вода від вибуху бомби */
+            background: radial-gradient(circle, #0c4a6e 0%, #082f49 100%) !important;
+            opacity: 0.85;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.7);
+            border: 1px solid #075985 !important;
+        }
+
+        .emoji-anim {
+            animation: pop-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            position: absolute;
+            z-index: 10;
+            filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));
+        }
+
+        /* Бомба, що падає */
+        .falling-bomb {
+            position: fixed;
+            width: 12px;
+            height: 30px;
+            background: linear-gradient(to bottom, #111 60%, #ef4444 100%);
+            border-radius: 50% 50% 10% 10%;
+            box-shadow: 0 -10px 15px rgba(239, 68, 68, 0.8);
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        /* Ключові кадри (Keyframes) */
+        @keyframes pulse-wave {
+            0% { transform: scale(0.8); opacity: 0.4; }
+            100% { transform: scale(1.2); opacity: 0.8; }
+        }
+        
+        /* Нова анімація для вогню (пульсація) */
+        @keyframes pulse-fire {
+            0% { box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 0 10px rgba(239, 68, 68, 0.4); }
+            100% { box-shadow: inset 0 0 10px rgba(0,0,0,0.5), 0 0 20px rgba(239, 68, 68, 0.8); }
+        }
+        
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-3px, 0, 0); }
+            40%, 60% { transform: translate3d(3px, 0, 0); }
+        }
+        @keyframes pop-in {
+            0% { transform: scale(0.1); opacity: 0; }
+            60% { transform: scale(1.4); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-6 px-4 relative">
+
+    <!-- Заголовок -->
+    <header class="text-center mb-6 w-full max-w-2xl">
+        <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 tracking-wider drop-shadow-md">
+            МОРСЬКИЙ БІЙ 🚢
+        </h1>
+        <p id="status-text" class="text-lg text-slate-300 mt-2 font-bold bg-slate-800 inline-block px-4 py-1 rounded-full border border-slate-700">Оберіть режим гри</p>
+    </header>
+
+    <!-- Лобі / Меню (Екран 1) -->
+    <div id="lobby-screen" class="w-full max-w-md bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700 text-center transition-all">
+        
+        <div class="space-y-5">
+            <!-- Гра з ботом -->
+            <button onclick="startBotGame()" class="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl text-xl font-black shadow-lg transition-transform active:scale-95 text-white">
+                🤖 Грати з Комп'ютером
+            </button>
+
+            <div class="relative py-2">
+                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-600"></div></div>
+                <div class="relative flex justify-center"><span class="bg-slate-800 px-4 text-sm text-slate-400 font-bold">АБО ПО МЕРЕЖІ З ДРУГОМ</span></div>
+            </div>
+
+            <!-- Створити гру (Мережа) -->
+            <div id="create-game-section">
+                <button onclick="createNetworkGame()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-xl text-xl font-black shadow-lg transition-transform active:scale-95 text-white">
+                    ➕ Створити Мережеву Гру
+                </button>
+            </div>
+
+            <!-- Інформація про підключення (прихована до створення) -->
+            <div id="connection-box" class="hidden flex-col gap-3 p-4 bg-slate-900 rounded-xl border border-slate-700">
+                <p class="text-sm text-slate-400 font-bold">Надішліть це посилання другу:</p>
+                
+                <div class="flex items-center gap-2">
+                    <input type="text" id="invite-link" readonly class="flex-1 bg-slate-800 text-emerald-400 text-sm p-3 rounded-lg border border-slate-700 focus:outline-none" value="...">
+                    <button onclick="copyInviteLink()" class="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-colors">
+                        📋 Копіювати
+                    </button>
+                </div>
+                
+                <p class="text-sm font-bold text-orange-400 mt-2 animate-pulse">⏳ Очікування підключення суперника...</p>
+            </div>
+
+            <div class="relative py-2">
+                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-600"></div></div>
+                <div class="relative flex justify-center"><span class="bg-slate-800 px-4 text-sm text-slate-400 font-bold">МАЄТЕ КОД?</span></div>
+            </div>
+
+            <!-- Приєднатися до гри -->
+            <div class="flex gap-2">
+                <input type="text" id="join-id-input" placeholder="Введіть код гри" class="flex-1 bg-slate-700 text-white px-4 py-3 rounded-xl font-bold text-center uppercase focus:outline-none focus:border-emerald-500 border-2 border-transparent transition-colors">
+                <button onclick="joinNetworkGame()" class="px-6 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-black shadow-lg transition-transform active:scale-95 text-white">
+                    Вхід
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ігровий екран (Екран 2) -->
+    <div id="game-screen" class="hidden w-full max-w-5xl flex-col md:flex-row gap-8 justify-center items-start">
+        
+        <!-- Мій флот -->
+        <div class="w-full md:w-1/2 flex flex-col items-center">
+            <div class="flex justify-between items-center w-full mb-3 px-2">
+                <h2 class="text-2xl font-black text-blue-400 flex items-center gap-2">🛡️ Мій Флот</h2>
+                <button id="btn-shuffle" onclick="shuffleMyShips()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-bold transition shadow">
+                    🎲 Перемішати
+                </button>
+            </div>
+            <div id="my-grid" class="battleship-grid w-full aspect-square"></div>
+            
+            <!-- Додано: Лічильник моїх кораблів -->
+            <div class="mt-4 text-sm font-bold text-slate-400 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 shadow-inner flex items-center gap-2 w-full justify-center">
+                🚢 Мій флот (вціліло): <span id="my-alive-count" class="text-blue-400 text-xl">10</span> / 10
+            </div>
+        </div>
+
+        <!-- Флот ворога -->
+        <div class="w-full md:w-1/2 flex flex-col items-center relative">
+            <div class="flex justify-between items-center w-full mb-3 px-2">
+                <h2 class="text-2xl font-black text-red-400 flex items-center gap-2">🎯 Супротивник</h2>
+            </div>
+            
+            <!-- Обгортка для ворожого поля (щоб оверлей не зникав) -->
+            <div class="relative w-full aspect-square">
+                <!-- Сама сітка -->
+                <div id="enemy-grid" class="battleship-grid absolute inset-0"></div>
+                
+                <!-- Оверлей блокування ходу -->
+                <div id="turn-overlay" class="absolute inset-0 bg-slate-900/60 z-20 rounded-lg flex items-center justify-center backdrop-blur-[2px] transition-opacity duration-300 pointer-events-none hidden">
+                    <span id="turn-overlay-text" class="text-lg md:text-xl font-black text-white px-6 py-3 bg-slate-800 rounded-full border border-slate-500 shadow-2xl">
+                        ХІД СУПРОТИВНИКА
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Додано: Лічильник ворожих кораблів -->
+            <div class="mt-4 text-sm font-bold text-slate-400 bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 shadow-inner flex items-center gap-2 w-full justify-center">
+                🎯 Ворогів потоплено: <span id="enemy-sunk-count" class="text-red-400 text-xl">0</span> / 10
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Панель реваншу (Екран 3 - з'являється після гри) -->
+    <div id="rematch-panel" class="hidden fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-slate-800 p-6 rounded-2xl shadow-2xl border-2 border-emerald-500 z-50 text-center w-[90%] max-w-sm">
+        <h3 id="rematch-title" class="text-2xl font-black text-white mb-4">ГРА ЗАВЕРШЕНА</h3>
+        <button onclick="requestRematch()" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xl font-black shadow-lg transition-transform active:scale-95 text-white">
+            🔄 Грати ще раз
+        </button>
+    </div>
+
+    <!-- JAVASCRIPT ЛОГІКА -->
+    <script>
+        const GRID_SIZE = 10;
+        const SHIPS_CONFIG = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1]; // Класичні правила
+
+        // Стан гри
+        let myGrid = [];
+        let enemyGrid = [];
+        let myShipsData = [];
+        let enemyShipsData = [];
+        
+        let isMyTurn = false;
+        let isGameOver = false;
+        let isAnimating = false;
+        let isBotMode = false;
+        
+        // Змінні для лічильників
+        let myShipsAlive = 10;
+        let enemyShipsSunk = 0;
+        
+        // Стан Мережі
+        let peer = null;
+        let conn = null;
+        let myPeerId = null;
+
+        // Стан Бота (Штучний інтелект)
+        let botMemory = []; // [ {r, c} ]
+        let botHuntQueue = []; // Клітини для добивання
+        let botHits = []; // Координати влучань у поточний корабель
+
+        // Аудіо (Web Audio API)
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'drop') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.4);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'hit') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(20, now + 0.5);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'miss') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(150, now + 0.3);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
             }
-            return true;
+        }
+
+        function updateStatsUI() {
+            const myCount = document.getElementById('my-alive-count');
+            const enemyCount = document.getElementById('enemy-sunk-count');
+            if (myCount) myCount.innerText = myShipsAlive;
+            if (enemyCount) enemyCount.innerText = enemyShipsSunk;
+        }
+
+        function createEmptyGrid() {
+            let grid = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                let row = [];
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    row.push({ hasShip: false, fired: false, shipId: null, status: 'water' });
+                }
+                grid.push(row);
+            }
+            return grid;
         }
 
         function placeShips(grid, shipsData) {
-            shipsData.length = 0;
+            shipsData.length = 0; // Очищення
             let idCounter = 0;
-            [4, 3, 3, 2, 2, 2, 1, 1, 1, 1].forEach(size => {
+
+            SHIPS_CONFIG.forEach(size => {
                 let placed = false;
                 while (!placed) {
                     const isHorizontal = Math.random() > 0.5;
-                    const r = Math.floor(Math.random() * 10);
-                    const c = Math.floor(Math.random() * 10);
+                    const r = Math.floor(Math.random() * GRID_SIZE);
+                    const c = Math.floor(Math.random() * GRID_SIZE);
+
                     if (canPlaceShip(grid, r, c, size, isHorizontal)) {
                         const shipObj = { id: idCounter++, size: size, hits: 0, coords: [] };
                         for (let i = 0; i < size; i++) {
@@ -88,69 +382,569 @@
             });
         }
 
-        // --- 2. Логіка гри (Bot, Start, Fire) ---
-        let myGrid, enemyGrid, myShipsData = [], enemyShipsData = [];
-        let isBotMode = false, isMyTurn = false, isAnimating = false, botMemory = [];
+        function canPlaceShip(grid, r, c, size, isHorizontal) {
+            if (isHorizontal && c + size > GRID_SIZE) return false;
+            if (!isHorizontal && r + size > GRID_SIZE) return false;
 
-        async function startBotGame() {
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
-            document.getElementById('game-screen').classList.add('flex');
-            isBotMode = true; isMyTurn = true;
-            myGrid = createEmptyGrid(); enemyGrid = createEmptyGrid();
-            placeShips(myGrid, myShipsData);
-            placeShips(enemyGrid, enemyShipsData);
-            renderGrid('my-grid', myGrid, false);
-            renderGrid('enemy-grid', enemyGrid, true);
-        }
+            // Перевірка на сусідство (кораблі не торкаються, відстань 1 клітинка)
+            for (let i = 0; i < size; i++) {
+                const nr = isHorizontal ? r : r + i;
+                const nc = isHorizontal ? c + i : c;
 
-        async function processShot(r, c, grid, shipsData, containerPrefix, isPlayerShooting) {
-            const cellData = grid[r][c];
-            cellData.fired = true;
-            cellData.status = cellData.hasShip ? 'hit' : 'miss';
-            renderGrid(containerPrefix, grid, containerPrefix === 'enemy-grid');
-            if (cellData.hasShip) {
-                const ship = shipsData.find(s => s.id === cellData.shipId);
-                ship.hits++;
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        const rr = nr + dr;
+                        const cc = nc + dc;
+                        if (rr >= 0 && rr < GRID_SIZE && cc >= 0 && cc < GRID_SIZE) {
+                            if (grid[rr][cc].hasShip) return false;
+                        }
+                    }
+                }
             }
-            isAnimating = false;
+            return true;
         }
 
         function renderGrid(containerId, gridData, isEnemy) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
-            for (let r = 0; r < 10; r++) {
-                for (let c = 0; c < 10; c++) {
+            
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cellData = gridData[r][c];
                     const cell = document.createElement('div');
-                    cell.className = `cell ${gridData[r][c].hasShip && !isEnemy ? 'cell-ship' : 'cell-water'}`;
-                    if (gridData[r][c].fired) {
-                        cell.classList.add(gridData[r][c].status === 'hit' ? 'explosion' : 'splash');
+                    cell.className = 'cell cell-water';
+                    cell.id = `${containerId}-${r}-${c}`;
+
+                    // Показуємо свої кораблі
+                    if (!isEnemy && cellData.hasShip) {
+                        cell.classList.remove('cell-water');
+                        cell.classList.add('cell-ship');
                     }
-                    if (isEnemy) cell.onclick = () => handlePlayerFire(r, c);
+
+                    // Обробка вже обстріляних клітинок
+                    if (cellData.fired) {
+                        applyCellResultCSS(cell, cellData.status);
+                    } else if (isEnemy) {
+                        cell.classList.add('enemy-cell');
+                        cell.onclick = () => handlePlayerFire(r, c);
+                    }
+
                     container.appendChild(cell);
                 }
             }
         }
 
+        function applyCellResultCSS(cellEl, status) {
+            cellEl.classList.remove('enemy-cell', 'cell-water', 'cell-ship');
+            cellEl.classList.add('fired'); // маркер, щоб не ховерити
+            
+            if (status === 'hit') {
+                cellEl.classList.add('explosion');
+                cellEl.innerHTML = '<span class="emoji-anim">💥</span>';
+            } else if (status === 'miss') {
+                cellEl.classList.add('splash');
+                cellEl.innerHTML = '<span class="emoji-anim">💦</span>';
+            }
+        }
+
+        function updateUI(msg, colorClass) {
+            const el = document.getElementById('status-text');
+            el.innerText = msg;
+            el.className = `text-lg font-black mt-2 bg-slate-800 inline-block px-4 py-1 rounded-full border border-slate-700 ${colorClass}`;
+            
+            const overlay = document.getElementById('turn-overlay');
+            const overlayText = document.getElementById('turn-overlay-text');
+
+            if (isGameOver) {
+                overlay.classList.remove('hidden');
+                overlayText.innerText = msg;
+                overlayText.className = "text-xl font-black text-white px-6 py-3 bg-slate-900 rounded-full border-2 border-orange-500 shadow-2xl";
+            } else if (isMyTurn) {
+                overlay.classList.add('hidden'); // Ховаємо оверлей — гравець може стріляти
+            } else {
+                overlay.classList.remove('hidden'); // Показуємо оверлей — блокуємо поле ворога
+                overlayText.innerText = "ХІД СУПРОТИВНИКА ⏳";
+                overlayText.className = "text-lg md:text-xl font-black text-white px-6 py-3 bg-slate-800 rounded-full border border-slate-500 shadow-2xl";
+            }
+        }
+
+        function animateBombDrop(targetCellEl) {
+            return new Promise(resolve => {
+                const rect = targetCellEl.getBoundingClientRect();
+                const bomb = document.createElement('div');
+                bomb.className = 'falling-bomb';
+                
+                // Стартує над клітинкою
+                bomb.style.left = `${rect.left + rect.width / 2 - 5}px`;
+                bomb.style.top = `${rect.top - 400}px`;
+                document.body.appendChild(bomb);
+
+                playSound('drop');
+
+                requestAnimationFrame(() => {
+                    bomb.style.transition = 'top 0.4s cubic-bezier(0.5, 0, 1, 1)';
+                    bomb.style.top = `${rect.top + rect.height / 2 - 12}px`;
+                });
+
+                setTimeout(() => {
+                    bomb.remove();
+                    resolve();
+                }, 400);
+            });
+        }
+
         async function handlePlayerFire(r, c) {
-            if (!isMyTurn || isAnimating) return;
+            if (!isMyTurn || isAnimating || isGameOver || enemyGrid[r][c].fired) return;
+            
+            initAudio();
             isAnimating = true;
-            await processShot(r, c, enemyGrid, enemyShipsData, 'enemy-grid', true);
-            isMyTurn = false;
-            if (isBotMode) setTimeout(botShoot, 1000);
+
+            if (isBotMode) {
+                await processLocalShot(r, c, enemyGrid, enemyShipsData, 'enemy-grid', true);
+            } else {
+                // Мережевий режим
+                conn.send({ type: 'FIRE', r, c });
+                // Очікуємо RESULT по мережі
+            }
         }
 
-        function botShoot() {
-            const r = Math.floor(Math.random() * 10);
-            const c = Math.floor(Math.random() * 10);
-            processShot(r, c, myGrid, myShipsData, 'my-grid', false);
-            isMyTurn = true;
+        async function processLocalShot(r, c, grid, shipsData, containerPrefix, isPlayerShooting) {
+            const cellData = grid[r][c];
+            const cellEl = document.getElementById(`${containerPrefix}-${r}-${c}`);
+            
+            cellData.fired = true;
+            await animateBombDrop(cellEl);
+
+            const isHit = cellData.hasShip;
+            let isSunk = false;
+            let sunkShipCoords = null;
+
+            if (isHit) {
+                playSound('hit');
+                cellData.status = 'hit';
+                
+                const ship = shipsData.find(s => s.id === cellData.shipId);
+                ship.hits++;
+                
+                if (ship.hits === ship.size) {
+                    isSunk = true;
+                    sunkShipCoords = ship.coords;
+                    
+                    // Оновлення лічильників
+                    if (isPlayerShooting) {
+                        enemyShipsSunk++;
+                    } else {
+                        myShipsAlive--;
+                    }
+                    updateStatsUI();
+
+                    markSurroundingWater(grid, ship, containerPrefix);
+                    updateUI(isPlayerShooting ? 'КОРАБЕЛЬ ПОТОПЛЕНО! 🔥' : 'ВАШ КОРАБЕЛЬ ПОТОПЛЕНО! 💀', isPlayerShooting ? 'text-green-400' : 'text-red-400');
+                } else {
+                    updateUI(isPlayerShooting ? 'ВЛУЧАННЯ! 🔥 Стріляйте ще.' : 'СУПРОТИВНИК ВЛУЧИВ! 💥', isPlayerShooting ? 'text-green-400' : 'text-red-400');
+                }
+            } else {
+                playSound('miss');
+                cellData.status = 'miss';
+                updateUI(isPlayerShooting ? 'ПРОМАХ! 💦' : 'СУПРОТИВНИК ПРОМАЗАВ! 💦', 'text-yellow-400');
+            }
+
+            applyCellResultCSS(cellEl, cellData.status);
+
+            // Перевірка перемоги
+            if (shipsData.every(s => s.hits === s.size)) {
+                endGame(isPlayerShooting);
+                return;
+            }
+
+            // Передача ходу
+            setTimeout(() => {
+                if (!isHit) {
+                    isMyTurn = !isMyTurn; // Хід переходить
+                    updateUI(isMyTurn ? 'ВАШ ХІД 🎯' : 'ХІД СУПРОТИВНИКА ⏳', isMyTurn ? 'text-emerald-400' : 'text-orange-400');
+                }
+                
+                isAnimating = false;
+
+                // Якщо це бот, і зараз його хід
+                if (isBotMode && !isMyTurn && !isGameOver) {
+                    // Передаємо боту результат його попереднього пострілу
+                    if (!isPlayerShooting) {
+                        botProcessResult(r, c, isHit, isSunk);
+                    }
+                    setTimeout(botShoot, 800);
+                }
+            }, 700);
         }
 
-        // --- 3. Мережеві функції (PeerJS) ---
-        function createGame() { /* Logic for PeerJS */ }
-        function joinGame() { /* Logic for PeerJS */ }
-        function copyLink() { navigator.clipboard.writeText(window.location.href); }
+        function markSurroundingWater(grid, ship, containerPrefix) {
+            ship.coords.forEach(coord => {
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        const rr = coord.r + dr;
+                        const cc = coord.c + dc;
+                        if (rr >= 0 && rr < GRID_SIZE && cc >= 0 && cc < GRID_SIZE) {
+                            if (!grid[rr][cc].fired && !grid[rr][cc].hasShip) {
+                                grid[rr][cc].fired = true;
+                                grid[rr][cc].status = 'miss';
+                                const cellEl = document.getElementById(`${containerPrefix}-${rr}-${cc}`);
+                                applyCellResultCSS(cellEl, 'miss');
+                                
+                                // Видаляємо ці клітинки з пам'яті бота, щоб він туди не стріляв
+                                if (isBotMode && containerPrefix === 'my-grid') {
+                                    botMemory = botMemory.filter(p => !(p.r === rr && p.c === cc));
+                                    botHuntQueue = botHuntQueue.filter(p => !(p.r === rr && p.c === cc));
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initBotMemory() {
+            botMemory = [];
+            botHuntQueue = [];
+            botHits = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    botMemory.push({r, c});
+                }
+            }
+        }
+
+        function isInBotMemory(r, c) {
+            return botMemory.some(p => p.r === r && p.c === c);
+        }
+
+        function botProcessResult(r, c, isHit, isSunk) {
+            if (isSunk) {
+                // Корабель потоплено - забуваємо про нього, переходимо в режим RANDOM
+                botHuntQueue = [];
+                botHits = [];
+            } else if (isHit) {
+                botHits.push({r, c});
+                
+                if (botHits.length === 1) {
+                    // Щойно влучили перший раз, перевіряємо 4 боки
+                    const neighbors = [
+                        {r: r-1, c: c}, {r: r+1, c: c}, {r: r, c: c-1}, {r: r, c: c+1}
+                    ];
+                    neighbors.forEach(n => {
+                        if (n.r >= 0 && n.r < GRID_SIZE && n.c >= 0 && n.c < GRID_SIZE) {
+                            if (isInBotMemory(n.r, n.c) && !botHuntQueue.some(p => p.r === n.r && p.c === n.c)) {
+                                botHuntQueue.push(n);
+                            }
+                        }
+                    });
+                } else if (botHits.length >= 2) {
+                    // Режим ТАРГЕТИНГУ: знаємо напрямок (горизонталь або вертикаль)
+                    botHuntQueue = []; // Очищаємо "дурну" чергу
+                    
+                    // Сортуємо влучання, щоб знайти краї корабля
+                    botHits.sort((a, b) => a.r - b.r || a.c - b.c);
+                    
+                    const isHorizontal = botHits[0].r === botHits[1].r;
+                    
+                    if (isHorizontal) {
+                        const leftCol = botHits[0].c - 1;
+                        const rightCol = botHits[botHits.length - 1].c + 1;
+                        const row = botHits[0].r;
+                        
+                        if (leftCol >= 0 && isInBotMemory(row, leftCol)) {
+                            botHuntQueue.push({r: row, c: leftCol});
+                        }
+                        if (rightCol < GRID_SIZE && isInBotMemory(row, rightCol)) {
+                            botHuntQueue.push({r: row, c: rightCol});
+                        }
+                    } else {
+                        const topRow = botHits[0].r - 1;
+                        const bottomRow = botHits[botHits.length - 1].r + 1;
+                        const col = botHits[0].c;
+                        
+                        if (topRow >= 0 && isInBotMemory(topRow, col)) {
+                            botHuntQueue.push({r: topRow, c: col});
+                        }
+                        if (bottomRow < GRID_SIZE && isInBotMemory(bottomRow, col)) {
+                            botHuntQueue.push({r: bottomRow, c: col});
+                        }
+                    }
+                }
+            }
+        }
+
+        async function botShoot() {
+            if (isGameOver || isMyTurn || isAnimating) return;
+            isAnimating = true;
+
+            let target;
+            if (botHuntQueue.length > 0) {
+                // Добиваємо корабель
+                target = botHuntQueue.shift();
+                // Видаляємо ціль з основної пам'яті
+                botMemory = botMemory.filter(p => !(p.r === target.r && p.c === target.c));
+            } else {
+                // Стріляємо випадково
+                const randomIndex = Math.floor(Math.random() * botMemory.length);
+                target = botMemory[randomIndex];
+                botMemory.splice(randomIndex, 1);
+            }
+
+            // Робимо постріл
+            await processLocalShot(target.r, target.c, myGrid, myShipsData, 'my-grid', false);
+        }
+
+        function generateShortID() {
+            return Math.random().toString(36).substring(2, 7).toUpperCase();
+        }
+
+        function createNetworkGame() {
+            initAudio();
+            document.getElementById('create-game-section').classList.add('hidden');
+            document.getElementById('connection-box').classList.remove('hidden');
+            document.getElementById('connection-box').classList.add('flex');
+            
+            myPeerId = generateShortID();
+            peer = new Peer(myPeerId);
+            
+            peer.on('open', (id) => {
+                const link = `${window.location.origin}${window.location.pathname}?join=${id}`;
+                document.getElementById('invite-link').value = link;
+            });
+
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnectionHandlers();
+                startGame(true); // Хост ходить першим
+            });
+            
+            peer.on('error', (err) => {
+                alert('Помилка мережі! Спробуйте грати з Ботом.');
+                console.error(err);
+            });
+        }
+
+        function joinNetworkGame(idToJoin = null) {
+            initAudio();
+            const joinId = idToJoin || document.getElementById('join-id-input').value.toUpperCase().trim();
+            if (!joinId) return alert('Введіть код гри!');
+            
+            peer = new Peer();
+            peer.on('open', () => {
+                conn = peer.connect(joinId);
+                conn.on('open', () => {
+                    setupConnectionHandlers();
+                    startGame(false); // Гість чекає
+                });
+                conn.on('error', () => alert('Не вдалося підключитися!'));
+            });
+            peer.on('error', () => alert('Помилка підключення!'));
+        }
+
+        function copyInviteLink() {
+            const linkInput = document.getElementById('invite-link');
+            linkInput.select();
+            document.execCommand('copy');
+            alert('Посилання скопійовано! Надішліть його другу.');
+        }
+
+        function setupConnectionHandlers() {
+            conn.on('data', async (data) => {
+                if (data.type === 'FIRE') {
+                    // Супротивник стріляє по нас
+                    isAnimating = true;
+                    
+                    const r = data.r;
+                    const c = data.c;
+                    const cellData = myGrid[r][c];
+                    cellData.fired = true;
+                    
+                    const cellEl = document.getElementById(`my-grid-${r}-${c}`);
+                    await animateBombDrop(cellEl);
+
+                    const isHit = cellData.hasShip;
+                    let isSunk = false;
+                    let shipCoords = null;
+
+                    if (isHit) {
+                        playSound('hit');
+                        cellData.status = 'hit';
+                        const ship = myShipsData.find(s => s.id === cellData.shipId);
+                        ship.hits++;
+                        if (ship.hits === ship.size) {
+                            isSunk = true;
+                            shipCoords = ship.coords;
+                            myShipsAlive--;
+                            updateStatsUI();
+                            markSurroundingWater(myGrid, ship, 'my-grid');
+                        }
+                    } else {
+                        playSound('miss');
+                        cellData.status = 'miss';
+                    }
+
+                    applyCellResultCSS(cellEl, cellData.status);
+
+                    // Відправляємо результат назад
+                    conn.send({
+                        type: 'RESULT',
+                        r: r, c: c,
+                        isHit: isHit,
+                        isSunk: isSunk,
+                        shipCoords: shipCoords
+                    });
+
+                    // Перевірка програшу
+                    if (myShipsData.every(s => s.hits === s.size)) {
+                        endGame(false);
+                        conn.send({ type: 'WIN' });
+                    } else {
+                        if (!isHit) {
+                            isMyTurn = true;
+                            updateUI('ВАШ ХІД 🎯', 'text-emerald-400');
+                        } else {
+                            updateUI('СУПРОТИВНИК ВЛУЧИВ! 💥', 'text-red-400');
+                        }
+                    }
+                    isAnimating = false;
+
+                } else if (data.type === 'RESULT') {
+                    // Результат нашого пострілу
+                    const cellData = enemyGrid[data.r][data.c];
+                    cellData.fired = true;
+                    const cellEl = document.getElementById(`enemy-grid-${data.r}-${data.c}`);
+                    
+                    await animateBombDrop(cellEl);
+
+                    if (data.isHit) {
+                        playSound('hit');
+                        cellData.status = 'hit';
+                        cellData.hasShip = true;
+                        
+                        if (data.isSunk) {
+                            enemyShipsSunk++;
+                            updateStatsUI();
+                            data.shipCoords.forEach(coord => {
+                                for(let dr=-1; dr<=1; dr++){
+                                    for(let dc=-1; dc<=1; dc++){
+                                        const rr = coord.r+dr; const cc = coord.c+dc;
+                                        if(rr>=0 && rr<GRID_SIZE && cc>=0 && cc<GRID_SIZE) {
+                                            if(!enemyGrid[rr][cc].fired && !enemyGrid[rr][cc].hasShip) {
+                                                enemyGrid[rr][cc].fired = true;
+                                                enemyGrid[rr][cc].status = 'miss';
+                                                applyCellResultCSS(document.getElementById(`enemy-grid-${rr}-${cc}`), 'miss');
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                            updateUI('КОРАБЕЛЬ ВОРОГА ПОТОПЛЕНО! 🔥', 'text-green-400');
+                        } else {
+                            updateUI('ВЛУЧАННЯ! 🔥', 'text-green-400');
+                        }
+                    } else {
+                        playSound('miss');
+                        cellData.status = 'miss';
+                        updateUI('ПРОМАХ! 💦', 'text-yellow-400');
+                        isMyTurn = false;
+                    }
+
+                    applyCellResultCSS(cellEl, cellData.status);
+                    
+                    setTimeout(() => {
+                        if (!isMyTurn && !isGameOver) updateUI('ХІД СУПРОТИВНИКА ⏳', 'text-orange-400');
+                    }, 1000);
+                    
+                    isAnimating = false;
+
+                } else if (data.type === 'WIN') {
+                    endGame(true);
+                } else if (data.type === 'REMATCH') {
+                    startRematch(false);
+                }
+            });
+        }
+
+        function startBotGame() {
+            initAudio();
+            isBotMode = true;
+            initBotMemory();
+            startGame(true); // Гравець ходить першим проти бота
+        }
+
+        function startGame(playerStartsFirst) {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('game-screen').classList.add('flex');
+            document.getElementById('rematch-panel').classList.add('hidden');
+            
+            isGameOver = false;
+            isAnimating = false;
+            isMyTurn = playerStartsFirst;
+            
+            // Скидання лічильників на початку кожної гри
+            myShipsAlive = 10;
+            enemyShipsSunk = 0;
+            updateStatsUI();
+            
+            myGrid = createEmptyGrid();
+            enemyGrid = createEmptyGrid();
+            
+            placeShips(myGrid, myShipsData);
+            if (isBotMode) placeShips(enemyGrid, enemyShipsData);
+            
+            renderGrid('my-grid', myGrid, false);
+            renderGrid('enemy-grid', enemyGrid, true);
+            
+            updateUI(isMyTurn ? 'ВАШ ХІД 🎯' : 'ОЧІКУВАННЯ ХОДУ ВОРОГА...', isMyTurn ? 'text-emerald-400' : 'text-orange-400');
+        }
+
+        function shuffleMyShips() {
+            if (isBotMode || !peer) { // Можна мішати проти бота, або доки не почалась мережева гра
+                myGrid = createEmptyGrid();
+                placeShips(myGrid, myShipsData);
+                renderGrid('my-grid', myGrid, false);
+                playSound('miss');
+            }
+        }
+
+        function endGame(didIWin) {
+            isGameOver = true;
+            isMyTurn = false; // Блокуємо стрільбу
+            
+            updateUI(didIWin ? '🏆 ВИ ПЕРЕМОГЛИ! 🏆' : '💀 ВИ ПРОГРАЛИ 💀', didIWin ? 'text-emerald-400 text-2xl' : 'text-red-500 text-2xl');
+            
+            // Показуємо панель реваншу
+            document.getElementById('rematch-panel').classList.remove('hidden');
+            document.getElementById('rematch-title').innerText = didIWin ? 'ПЕРЕМОГА!' : 'ПОРАЗКА';
+            document.getElementById('rematch-title').className = didIWin ? 'text-3xl font-black text-emerald-400 mb-4' : 'text-3xl font-black text-red-500 mb-4';
+        }
+
+        function requestRematch() {
+            if (isBotMode) {
+                // Миттєвий реванш з ботом
+                startBotGame();
+            } else {
+                // Надсилаємо запит по мережі
+                conn.send({ type: 'REMATCH' });
+                startRematch(true); // Хост стає першим
+            }
+        }
+
+        function startRematch(amIFirst) {
+            startGame(amIFirst);
+        }
+
+        // Автоматичний вхід за посиланням
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const joinParam = urlParams.get('join');
+            if (joinParam) {
+                document.getElementById('join-id-input').value = joinParam;
+                setTimeout(() => joinNetworkGame(joinParam), 500); // Автостарт
+            }
+        };
+
     </script>
 </body>
 </html>
