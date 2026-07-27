@@ -8,9 +8,9 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
-        body { font-family: 'Nunito', sans-serif; background-color: #0f172a; color: #f8fafc; }
-        .battleship-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; background-color: #1e293b; padding: 4px; border-radius: 8px; border: 2px solid #334155; }
-        .cell { aspect-ratio: 1 / 1; position: relative; border-radius: 2px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: clamp(1rem, 4vw, 1.5rem); }
+        body { font-family: 'Nunito', sans-serif; background-color: #0f172a; color: #f8fafc; overflow-x: hidden; }
+        .battleship-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; background-color: #1e293b; padding: 4px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid #334155; }
+        .cell { aspect-ratio: 1 / 1; position: relative; border-radius: 2px; cursor: pointer; transition: transform 0.1s, filter 0.2s; display: flex; align-items: center; justify-content: center; font-size: clamp(1rem, 4vw, 1.5rem); }
         .cell-water { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); }
         .cell-ship { background: repeating-linear-gradient(45deg, #475569, #475569 4px, #334155 4px, #334155 8px); }
         .explosion { background-color: #ef4444 !important; }
@@ -19,78 +19,138 @@
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center py-6 px-4">
-
     <header class="text-center mb-6">
         <h1 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 tracking-wider">МОРСЬКИЙ БІЙ 🚢</h1>
         <p id="status-text" class="text-lg text-slate-300 mt-2 font-bold animate-pulse">Оберіть режим гри</p>
     </header>
 
-    <div id="lobby-screen" class="w-full max-w-md bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
+    <div id="lobby-screen" class="w-full max-w-md bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 text-center">
         <button onclick="startBotGame()" class="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-xl font-bold transition-transform active:scale-95">🤖 Грати з розумним Ботом</button>
+        <div class="relative py-4"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-600"></div></div><div class="relative flex justify-center"><span class="bg-slate-800 px-4 text-slate-400">АБО</span></div></div>
+        <button onclick="createGame()" id="btn-create" class="w-full py-3 bg-blue-600 rounded-xl font-bold">➕ Створити гру</button>
+        <div id="connection-box" class="hidden flex-col gap-3 p-4 bg-slate-900 rounded-xl mt-4">
+            <span id="my-id-display" class="text-2xl font-black text-emerald-400 tracking-widest bg-slate-800 px-4 py-2 rounded-lg">...</span>
+            <button onclick="copyLink()" class="text-sm text-blue-400 underline">🔗 Скопіювати посилання</button>
+        </div>
+        <input type="text" id="join-id-input" placeholder="Код друга" class="w-full mt-4 bg-slate-700 p-3 rounded-xl text-center uppercase">
+        <button onclick="joinGame()" class="w-full mt-2 py-3 bg-emerald-600 rounded-xl font-bold">Вхід</button>
     </div>
 
     <div id="game-screen" class="hidden w-full max-w-4xl flex-col md:flex-row gap-8 justify-center items-start">
-        <div class="w-full md:w-1/2 flex flex-col items-center">
-            <h2 class="text-2xl font-bold text-blue-300 mb-3">Мій Флот</h2>
-            <div id="my-grid" class="battleship-grid w-full max-w-sm"></div>
-        </div>
-        <div class="w-full md:w-1/2 flex flex-col items-center">
-            <h2 class="text-2xl font-bold text-red-400 mb-3">Супротивник</h2>
-            <div id="enemy-grid" class="battleship-grid w-full max-w-sm"></div>
-        </div>
+        <div id="my-grid" class="battleship-grid w-full max-w-sm"></div>
+        <div id="enemy-grid" class="battleship-grid w-full max-w-sm relative"><div id="turn-overlay" class="absolute inset-0 bg-slate-900/60 z-20 flex items-center justify-center backdrop-blur-sm hidden"></div></div>
     </div>
 
     <script>
-        const GRID_SIZE = 10;
-        let myGrid = [], enemyGrid = [], myShipsData = [], enemyShipsData = [];
-        let botMemory = [], huntQueue = [];
-
+        // --- 1. Оголошення функцій-помічників (щоб не було помилок) ---
         function createEmptyGrid() {
-            return Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null).map(() => ({hasShip: false, fired: false, status: 'water'})));
+            return Array(10).fill(null).map(() => Array(10).fill(null).map(() => ({hasShip: false, fired: false, shipId: null, status: 'water'})));
         }
 
-        function startBotGame() {
-            myGrid = createEmptyGrid(); enemyGrid = createEmptyGrid();
-            placeShips(myGrid, myShipsData); placeShips(enemyGrid, enemyShipsData);
+        function canPlaceShip(grid, r, c, size, isHorizontal) {
+            if (isHorizontal && c + size > 10) return false;
+            if (!isHorizontal && r + size > 10) return false;
+            for (let i = 0; i < size; i++) {
+                const nr = isHorizontal ? r : r + i;
+                const nc = isHorizontal ? c + i : c;
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        const rr = nr + dr; const cc = nc + dc;
+                        if (rr >= 0 && rr < 10 && cc >= 0 && cc < 10 && grid[rr][cc].hasShip) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function placeShips(grid, shipsData) {
+            shipsData.length = 0;
+            let idCounter = 0;
+            [4, 3, 3, 2, 2, 2, 1, 1, 1, 1].forEach(size => {
+                let placed = false;
+                while (!placed) {
+                    const isHorizontal = Math.random() > 0.5;
+                    const r = Math.floor(Math.random() * 10);
+                    const c = Math.floor(Math.random() * 10);
+                    if (canPlaceShip(grid, r, c, size, isHorizontal)) {
+                        const shipObj = { id: idCounter++, size: size, hits: 0, coords: [] };
+                        for (let i = 0; i < size; i++) {
+                            const nr = isHorizontal ? r : r + i;
+                            const nc = isHorizontal ? c + i : c;
+                            grid[nr][nc].hasShip = true;
+                            grid[nr][nc].shipId = shipObj.id;
+                            shipObj.coords.push({r: nr, c: nc});
+                        }
+                        shipsData.push(shipObj);
+                        placed = true;
+                    }
+                }
+            });
+        }
+
+        // --- 2. Логіка гри (Bot, Start, Fire) ---
+        let myGrid, enemyGrid, myShipsData = [], enemyShipsData = [];
+        let isBotMode = false, isMyTurn = false, isAnimating = false, botMemory = [];
+
+        async function startBotGame() {
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('game-screen').classList.add('flex');
+            isBotMode = true; isMyTurn = true;
+            myGrid = createEmptyGrid(); enemyGrid = createEmptyGrid();
+            placeShips(myGrid, myShipsData);
+            placeShips(enemyGrid, enemyShipsData);
             renderGrid('my-grid', myGrid, false);
             renderGrid('enemy-grid', enemyGrid, true);
-            botMemory = []; for(let r=0;r<10;r++) for(let c=0;c<10;c++) botMemory.push({r,c});
-            updateUI('Ваш хід! 🎯', 'text-emerald-400');
         }
 
-        async function botShoot() {
-            let target;
-            if (huntQueue.length > 0) {
-                target = huntQueue.shift();
-            } else {
-                target = botMemory[Math.floor(Math.random() * botMemory.length)];
+        async function processShot(r, c, grid, shipsData, containerPrefix, isPlayerShooting) {
+            const cellData = grid[r][c];
+            cellData.fired = true;
+            cellData.status = cellData.hasShip ? 'hit' : 'miss';
+            renderGrid(containerPrefix, grid, containerPrefix === 'enemy-grid');
+            if (cellData.hasShip) {
+                const ship = shipsData.find(s => s.id === cellData.shipId);
+                ship.hits++;
             }
-            
-            botMemory = botMemory.filter(p => !(p.r === target.r && p.c === target.c));
-            await processShot(target.r, target.c, myGrid, myShipsData, 'my-grid', false);
+            isAnimating = false;
         }
 
-        async function processShot(r, c, grid, shipsData, containerPrefix, isPlayer) {
-            const cell = grid[r][c]; cell.fired = true;
-            if (cell.hasShip) {
-                cell.status = 'hit';
-                if (!isPlayer) {
-                    // Розумний бот: додає сусідів у чергу
-                    [{r:r-1, c}, {r:r+1, c}, {r, c:c-1}, {r, c:c+1}].forEach(p => {
-                        if(p.r>=0 && p.r<10 && p.c>=0 && p.c<10 && !grid[p.r][p.c].fired) huntQueue.push(p);
-                    });
+        function renderGrid(containerId, gridData, isEnemy) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 10; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = `cell ${gridData[r][c].hasShip && !isEnemy ? 'cell-ship' : 'cell-water'}`;
+                    if (gridData[r][c].fired) {
+                        cell.classList.add(gridData[r][c].status === 'hit' ? 'explosion' : 'splash');
+                    }
+                    if (isEnemy) cell.onclick = () => handlePlayerFire(r, c);
+                    container.appendChild(cell);
                 }
-            } else {
-                cell.status = 'miss';
             }
-            renderGrid(containerPrefix, grid, !isPlayer);
-            if (!isPlayer && !cell.hasShip) isMyTurn = true;
-            if (isPlayer && !cell.hasShip) setTimeout(botShoot, 1000);
         }
 
-        // ... (інші функції: placeShips, renderGrid тощо — залишаються без змін)
+        async function handlePlayerFire(r, c) {
+            if (!isMyTurn || isAnimating) return;
+            isAnimating = true;
+            await processShot(r, c, enemyGrid, enemyShipsData, 'enemy-grid', true);
+            isMyTurn = false;
+            if (isBotMode) setTimeout(botShoot, 1000);
+        }
+
+        function botShoot() {
+            const r = Math.floor(Math.random() * 10);
+            const c = Math.floor(Math.random() * 10);
+            processShot(r, c, myGrid, myShipsData, 'my-grid', false);
+            isMyTurn = true;
+        }
+
+        // --- 3. Мережеві функції (PeerJS) ---
+        function createGame() { /* Logic for PeerJS */ }
+        function joinGame() { /* Logic for PeerJS */ }
+        function copyLink() { navigator.clipboard.writeText(window.location.href); }
     </script>
 </body>
 </html>
